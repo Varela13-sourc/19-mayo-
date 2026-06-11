@@ -107,7 +107,7 @@
               <i class="fa-solid fa-magnifying-glass text-slate-400 ml-2"></i>
               <input id="searchInput" class="bg-transparent border-none text-sm w-full outline-none text-slate-700 font-semibold py-2.5 placeholder:text-slate-400" placeholder="Buscar..." />
               <div class="h-6 w-px bg-slate-200 mx-1"></div>
-              <select id="filterStatus" class="bg-transparent text-[11px] font-bold text-slate-500 outline-none hover:text-panBlue cursor-pointer py-2 pr-2 uppercase tracking-wider"><option value="">TODOS</option><option value="COMPROMETIDO">COMPROMETIDO</option><option value="RECIBIDA">RECIBIDA</option><option value="AUTORIZADA">AUTORIZADA</option><option value="EN_DESPACHO">EN DESPACHO</option><option value="AGENDADA_RECOLECCION">AGENDADA</option><option value="PENDIENTE_RECOGER">PENDIENTE RECOGER</option><option value="PARCIALMENTE_RECOGIDA">PARCIAL</option><option value="RECOGIDA">RECOGIDA</option><option value="VENCIDA">VENCIDA</option><option value="EN_COMPROBACION">EN COMPROBACIÓN</option><option value="ENTREGADA">ENTREGADA</option><option value="COMPROBADA">COMPROBADA</option><option value="CANCELADA">CANCELADA</option></select>
+              <select id="filterStatus" class="bg-transparent text-[11px] font-bold text-slate-500 outline-none hover:text-panBlue cursor-pointer py-2 pr-2 uppercase tracking-wider"><option value="">TODOS</option><option value="COMPROMETIDO">COMPROMETIDO</option><option value="RECIBIDA">RECIBIDA</option><option value="AUTORIZADA">AUTORIZADA</option><option value="EN_DESPACHO">EN DESPACHO</option><option value="AGENDADA_RECOLECCION">AGENDADA</option><option value="PENDIENTE_RECOGER">PENDIENTE RECOGER</option><option value="PARCIALMENTE_RECOGIDA">PARCIAL</option><option value="RECOGIDA">RECOGIDA</option><option value="VENCIDA">VENCIDA</option><option value="EN_COMPROBACION">EN COMPROBACIÓN</option><option value="IMPORTADO_EN_REVISION">IMPORTADO EN REVISIÓN</option><option value="ENTREGADA">ENTREGADA</option><option value="COMPROBADA">COMPROBADA</option><option value="CANCELADA">CANCELADA</option></select>
               <select id="filterMunicipio" class="hidden bg-transparent text-[11px] font-bold text-slate-500 outline-none hover:text-panBlue cursor-pointer py-2 pr-2 uppercase tracking-wider min-w-[150px]"><option value="">TODOS</option></select>
               <button type="button" id="btnRefresh" class="h-9 w-9 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-panBlue hover:border-panBlue transition flex items-center justify-center shadow-sm"><i class="fa-solid fa-rotate text-xs"></i></button>
             </div>
@@ -311,21 +311,8 @@ const CONFIG = {
 };
 
 let CATALOGOS = {};
-const STATUS_TRANSITIONS = {
-    NUEVO: ['RECIBIDA'],
-    RECIBIDA: ['AUTORIZADA','CANCELADA'],
-    AUTORIZADA: ['EN_DESPACHO','CANCELADA'],
-    EN_DESPACHO: ['AGENDADA_RECOLECCION','CANCELADA'],
-    AGENDADA_RECOLECCION: ['PENDIENTE_RECOGER','VENCIDA','CANCELADA'],
-    PENDIENTE_RECOGER: ['PARCIALMENTE_RECOGIDA','RECOGIDA','VENCIDA','EN_COMPROBACION','CANCELADA'],
-    PARCIALMENTE_RECOGIDA: ['PARCIALMENTE_RECOGIDA','PENDIENTE_RECOGER','RECOGIDA','VENCIDA','EN_COMPROBACION','CANCELADA'],
-    RECOGIDA: ['EN_COMPROBACION','ENTREGADA'],
-    ENTREGADA: ['EN_COMPROBACION','COMPROBADA'],
-    EN_COMPROBACION: ['COMPROBADA'],
-    VENCIDA: ['CANCELADA'],
-    COMPROBADA: [],
-    CANCELADA: []
-};
+const STATUS_OPTIONS = ['RECIBIDA','EN_VALIDACION','PENDIENTE_VALIDACION','AUTORIZADA','RECHAZADA_DIRECCION','EN_DESPACHO','AGENDADA_RECOLECCION','PENDIENTE_RECOGER','PARCIALMENTE_RECOGIDA','RECOGIDA','ENTREGADA','EN_COMPROBACION','COMPROBADA','VENCIDA','CANCELADA','EXHORTO','IMPORTADO_EN_REVISION'];
+const TIPO_SOLICITANTE_OPTIONS = ['Persona','Escuela','Asociación','Comité','Institución','Dependencia','Colectivo','Presidente municipal','Actor social','Otro'];
 const Store={session:null,currentView:'dashboard',data:[],filteredData:[],stats:{},isEditMode:false,currentEditId:null,currentRecord:null,currentHistory:[],currentMovements:[],lastStockSummary:[], rowIndex: null};
 const API={async request(action,payload){const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),45000);try{const p=typeof action==='string'?Object.assign({tipoRegistro:action==='updateGestion'?'ACTUALIZAR':action},payload||{}):action;const r=await fetch(CONFIG.API_URL,{method:"POST",body:JSON.stringify(p),signal:ctrl.signal});clearTimeout(t);return await r.json();}catch(e){clearTimeout(t);console.error(e);return{ok:false,message:e.name==='AbortError'?'La API tardó demasiado en responder. Intenta de nuevo.':'Error de red o respuesta inválida de la API.'};}}};
 
@@ -377,12 +364,13 @@ const UI={
         c.innerHTML=CONFIG.VIEWS.map(v=>`<button type="button" onclick="App.changeView('${v.id}')" class="w-full text-left px-5 py-3 rounded-2xl text-slate-600 hover:bg-slate-50 hover:text-panBlue font-bold text-sm transition flex items-center gap-3 group"><i class="fa-solid ${v.icon} w-5 text-slate-400 group-hover:text-panBlue transition"></i> ${v.label}</button>`).join('');
     },
     ingestCatalogos(list){
-        CATALOGOS = { DIPUTADOS_FEDERALES:{}, DIPUTADOS_LOCALES:{}, MUNICIPIOS:{}, ACTORES:{}, MUNI_SOLICITANTES:[], PROVEEDOR_ORDENES:[] };
+        CATALOGOS = { DIPUTADOS_FEDERALES:{}, DIPUTADOS_LOCALES:{}, MUNICIPIOS:{}, ACTORES:{}, MUNI_SOLICITANTES:[], SOLICITANTES:[], PROVEEDOR_ORDENES:[] };
         (list||[]).forEach(c => {
             if(c.type==='DIP_FED') CATALOGOS.DIPUTADOS_FEDERALES[c.name] = c.detail;
             if(c.type==='DIP_LOC') CATALOGOS.DIPUTADOS_LOCALES[c.name] = c.detail;
             if(c.type==='MUNICIPIO') CATALOGOS.MUNICIPIOS[c.name] = c.detail;
             if(c.type==='MUNI_SOLICITANTE') CATALOGOS.MUNI_SOLICITANTES.push(c);
+            if(c.type==='SOLICITANTE') CATALOGOS.SOLICITANTES.push(c);
             if(c.type==='PROVEEDOR_ORDEN') CATALOGOS.PROVEEDOR_ORDENES.push(c);
         });
     },
@@ -510,17 +498,57 @@ const UI={
         const sl = document.getElementById('fSolicMunicipal');
         if(!sl) return;
         sl.innerHTML = '<option value="">-- NUEVO / PRESIDENTE --</option>';
-        (CATALOGOS.MUNI_SOLICITANTES||[]).filter(x=>String(x.municipio||'')===String(mun)).forEach((x,idx)=>{
-            sl.insertAdjacentHTML('beforeend', `<option value="${idx}">${x.name} - ${x.detail}</option>`);
+        const base = (CATALOGOS.MUNI_SOLICITANTES||[]).filter(x=>String(x.municipio||'')===String(mun));
+        const generales = (CATALOGOS.SOLICITANTES||[]).filter(x=>!mun || this.itemKey(x.municipio||'')===this.itemKey(mun));
+        const seen = {};
+        CATALOGOS._MUNI_SOLICITANTES_VIEW = [];
+        base.concat(generales).forEach((x)=>{
+            const key = this.itemKey((x.name||'') + '|' + (x.municipio||''));
+            if(!x.name || seen[key]) return;
+            seen[key] = true;
+            CATALOGOS._MUNI_SOLICITANTES_VIEW.push(x);
+            sl.insertAdjacentHTML('beforeend', `<option value="${CATALOGOS._MUNI_SOLICITANTES_VIEW.length - 1}">${this.esc(x.name)}${x.detail?' - '+this.esc(x.detail):''}</option>`);
         });
     },
     applyMunicipalSolicitante(){
         const mun = document.getElementById('fMunicipio')?.value || '';
         const sl = document.getElementById('fSolicMunicipal');
         if(!sl || sl.value==='') return;
-        const arr = (CATALOGOS.MUNI_SOLICITANTES||[]).filter(x=>String(x.municipio||'')===String(mun));
+        const arr = CATALOGOS._MUNI_SOLICITANTES_VIEW || [];
         const item = arr[Number(sl.value)];
-        if(item){ document.getElementById('fNombre').value = item.name || ''; document.getElementById('fPuesto').value = item.detail || ''; }
+        if(item){
+            document.getElementById('fNombre').value = item.name || '';
+            if(document.getElementById('fPuesto')) document.getElementById('fPuesto').value = item.puesto || item.detail || '';
+            if(document.getElementById('fTelefono')) document.getElementById('fTelefono').value = item.telefono || document.getElementById('fTelefono').value || '';
+            if(document.getElementById('fColonia')) document.getElementById('fColonia').value = item.colonia || document.getElementById('fColonia').value || '';
+            if(document.getElementById('fSeccion')) document.getElementById('fSeccion').value = item.seccion || document.getElementById('fSeccion').value || '';
+            if(document.getElementById('fTipoSolicitante')) document.getElementById('fTipoSolicitante').value = item.tipoSolicitante || document.getElementById('fTipoSolicitante').value || 'Otro';
+        }
+    },
+    solicitanteCatalogoSelectHTML(selectedName=''){
+        const opts = (CATALOGOS.SOLICITANTES||[]).map((x,idx)=>{
+            const label = `${x.name || ''}${x.municipio ? ' | '+x.municipio : ''}${x.tipoSolicitante ? ' | '+x.tipoSolicitante : ''}`;
+            return `<option value="${idx}" ${this.itemKey(x.name)===this.itemKey(selectedName)?'selected':''}>${this.esc(label)}</option>`;
+        }).join('');
+        return `<div class="col-span-1"><label class="block text-[10px] font-extrabold text-slate-500 mb-2 ml-1 uppercase tracking-widest">Solicitante guardado</label><select id="fSolicCatalogo" onchange="UI.applySolicitanteCatalogo()" class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:border-panBlue outline-none font-bold transition cursor-pointer"><option value="">-- NUEVO --</option>${opts}</select></div>`;
+    },
+    tipoSolicitanteSelectHTML(value=''){
+        const current = value || (Store.currentView==='actor_social' ? 'Actor social' : Store.currentView==='municipio' ? 'Presidente municipal' : 'Persona');
+        const opts = TIPO_SOLICITANTE_OPTIONS.map(t=>`<option value="${this.esc(t)}" ${this.itemKey(t)===this.itemKey(current)?'selected':''}>${this.esc(t)}</option>`).join('');
+        return `<div class="col-span-1"><label class="block text-[10px] font-extrabold text-slate-500 mb-2 ml-1 uppercase tracking-widest">Tipo solicitante</label><select id="fTipoSolicitante" class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:border-panBlue outline-none font-bold transition cursor-pointer">${opts}</select></div>`;
+    },
+    applySolicitanteCatalogo(){
+        const sl = document.getElementById('fSolicCatalogo');
+        if(!sl || sl.value==='') return;
+        const item = (CATALOGOS.SOLICITANTES||[])[Number(sl.value)];
+        if(!item) return;
+        if(document.getElementById('fNombre')) document.getElementById('fNombre').value = item.name || '';
+        if(document.getElementById('fMunicipio') && item.municipio) document.getElementById('fMunicipio').value = item.municipio;
+        if(document.getElementById('fPuesto')) document.getElementById('fPuesto').value = item.puesto || item.detail || '';
+        if(document.getElementById('fTelefono')) document.getElementById('fTelefono').value = item.telefono || '';
+        if(document.getElementById('fColonia')) document.getElementById('fColonia').value = item.colonia || '';
+        if(document.getElementById('fSeccion')) document.getElementById('fSeccion').value = item.seccion || '';
+        if(document.getElementById('fTipoSolicitante')) document.getElementById('fTipoSolicitante').value = item.tipoSolicitante || 'Otro';
     },
 
     renderDashboardInventory(items){
@@ -545,21 +573,9 @@ const UI={
     buildForm(isInv, d={}){
         const f=document.getElementById('dynamicForm');f.innerHTML='';
         const view = Store.currentView;
-        // Limit the list of available statuses to those that are actually supported by the system.
-        const statusList = [
-            'RECIBIDA',
-            'AUTORIZADA',
-            'EN_DESPACHO',
-            'AGENDADA_RECOLECCION',
-            'PENDIENTE_RECOGER',
-            'PARCIALMENTE_RECOGIDA',
-            'RECOGIDA',
-            'VENCIDA',
-            'EN_COMPROBACION',
-            'ENTREGADA',
-            'COMPROBADA',
-            'CANCELADA'
-        ];
+        const currentStatus = String(d.Estatus_Actual || '').trim().toUpperCase().replace(/\s+/g,'_');
+        const statusList = [...STATUS_OPTIONS];
+        if(currentStatus && !statusList.includes(currentStatus)) statusList.push(currentStatus);
         const statusOptions = statusList.map(s => `<option value="${s}">${s.replaceAll('_',' ')}</option>`).join('');
         
         f.innerHTML=this.mkInp('Fecha Solicitud','fFecha',d.Fecha_Recepcion?d.Fecha_Recepcion.split('T')[0]:new Date().toISOString().split('T')[0],'','date')+this.mkInp('Canal de Entrada','fCanal',d.Canal_Entrada,'text','col-span-1')+`<div class="col-span-1"><label class="block text-[10px] font-extrabold text-slate-500 mb-2 ml-1 uppercase tracking-widest">Estatus Actual</label><select id="fEstatus" class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:border-panBlue outline-none font-bold cursor-pointer uppercase tracking-wider">${statusOptions}</select></div>`;
@@ -570,13 +586,16 @@ const UI={
             f.innerHTML+= `<div class="md:col-span-2"><label class="block text-[10px] font-extrabold text-slate-500 mb-2 ml-1 uppercase tracking-widest">Diputado(a)</label><select id="fNombre" onchange="const d=CATALOGOS.DIPUTADOS_FEDERALES[this.value]||CATALOGOS.DIPUTADOS_LOCALES[this.value]; document.getElementById('fDetalle').innerText=d||''" class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:border-panBlue outline-none font-bold transition cursor-pointer"><option value="">-- SELECCIONAR --</option><optgroup label="--- FEDERALES ---" class="font-extrabold text-panBlue">${fed}</optgroup><optgroup label="--- LOCALES ---" class="font-extrabold text-panBlue">${loc}</optgroup></select><p id="fDetalle" class="text-[10px] text-blue-600 font-bold mt-1 uppercase"></p></div>`+this.mkInp('Distrito / Partido (Automático)','fMunicipio',d.Municipio,'','text');
         } else if (view === 'municipio') {
             const opts = Object.keys(CATALOGOS.MUNICIPIOS||{}).map(k => `<option value="${k}">${k}</option>`).join('');
-            f.innerHTML+= `<div class="col-span-1"><label class="block text-[10px] font-extrabold text-slate-500 mb-2 ml-1 uppercase tracking-widest">Municipio</label><select id="fMunicipio" onchange="UI.fillMunicipioSolicitantes(); const p=CATALOGOS.MUNICIPIOS[this.value]||''; document.getElementById('fNombre').value=p.replace('Presidente: ',''); document.getElementById('fPuesto').value='Presidente Municipal'" class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:border-panBlue outline-none font-bold transition cursor-pointer"><option value="">-- SELECCIONAR --</option>${opts}</select></div><div class="col-span-1"><label class="block text-[10px] font-extrabold text-slate-500 mb-2 ml-1 uppercase tracking-widest">Solicitante guardado</label><select id="fSolicMunicipal" onchange="UI.applyMunicipalSolicitante()" class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:border-panBlue outline-none font-bold transition cursor-pointer"><option value="">-- NUEVO / PRESIDENTE --</option></select></div>`+this.mkInp('Nombre completo solicitante','fNombre',d.Nombre_Solicitante,'text','col-span-1')+this.mkInp('Puesto','fPuesto',d.Puesto_Solicitante||'Presidente Municipal','text','col-span-1');
+            f.innerHTML+= `<div class="col-span-1"><label class="block text-[10px] font-extrabold text-slate-500 mb-2 ml-1 uppercase tracking-widest">Municipio</label><select id="fMunicipio" onchange="UI.fillMunicipioSolicitantes(); const p=CATALOGOS.MUNICIPIOS[this.value]||''; document.getElementById('fNombre').value=p.replace('Presidente: ',''); document.getElementById('fPuesto').value='Presidente Municipal'; if(document.getElementById('fTipoSolicitante')) document.getElementById('fTipoSolicitante').value='Presidente municipal'" class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:border-panBlue outline-none font-bold transition cursor-pointer"><option value="">-- SELECCIONAR --</option>${opts}</select></div><div class="col-span-1"><label class="block text-[10px] font-extrabold text-slate-500 mb-2 ml-1 uppercase tracking-widest">Solicitante guardado</label><select id="fSolicMunicipal" onchange="UI.applyMunicipalSolicitante()" class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:border-panBlue outline-none font-bold transition cursor-pointer"><option value="">-- NUEVO / PRESIDENTE --</option></select></div>`+this.mkInp('Nombre completo solicitante','fNombre',d.Nombre_Solicitante,'text','col-span-1')+this.mkInp('Puesto','fPuesto',d.Puesto_Solicitante||'Presidente Municipal','text','col-span-1')+this.tipoSolicitanteSelectHTML(d.Tipo_Solicitante||'Presidente municipal');
         } else if (view === 'actor_social') {
             const optsActor = ["Recaudador de rentas", "Líder de colonia", "Evento Especial", "Asociación Civil", "Dependencia Estatal", "Dependencia Municipal"].map(o => `<option value="${o}">${o}</option>`).join('');
             f.innerHTML += this.mkInp('Nombre del Actor / Representante','fNombre',d.Nombre_Solicitante,'text','md:col-span-2')+`<div class="col-span-1"><label class="block text-[10px] font-extrabold text-slate-500 mb-2 ml-1 uppercase tracking-widest">Clasificación</label><select id="fMunicipio" class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:border-panBlue outline-none font-bold transition cursor-pointer"><option value="">-- SELECCIONAR --</option>${optsActor}</select></div>`;
         } else if (view === 'ventanilla_unica') {
             f.innerHTML += this.mkInp('Intermediario / Área que recibe','fNombre',d.Nombre_Solicitante,'text','md:col-span-2')+this.mkInp('Destino final / Grupo beneficiario','fMunicipio',d.Municipio,'text','col-span-1')+this.mkInp('Responsable de entrega posterior','fIntermediario',d.Intermediario_Entrega,'text','md:col-span-2');
         } else { f.innerHTML+=this.mkInp('Nombre Solicitante','fNombre',d.Nombre_Solicitante,'text','md:col-span-2')+this.mkInp('Municipio','fMunicipio',d.Municipio,'text','col-span-1'); }
+        if(['ciudadano','actor_social','ventanilla_unica'].includes(view)) {
+            f.innerHTML += this.solicitanteCatalogoSelectHTML(d.Nombre_Solicitante)+this.tipoSolicitanteSelectHTML(d.Tipo_Solicitante || (view==='actor_social'?'Actor social':view==='ventanilla_unica'?'Institución':'Persona'));
+        }
         
         f.innerHTML+=this.mkInp('Teléfono','fTelefono',d.Telefono_Solicitante,'text','col-span-1')+this.mkInp('Colonia','fColonia',d.Colonia)+this.mkInp('Sección','fSeccion',d.Seccion)+`<div class="md:col-span-3"><label class="block text-[10px] font-extrabold text-slate-500 mb-2 ml-1 uppercase tracking-widest">Descripción de la Necesidad</label><textarea id="fDesc" rows="3" class="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 focus:border-panBlue outline-none transition font-medium placeholder:text-slate-300 shadow-sm resize-none">${d.Descripcion_Necesidad||''}</textarea></div>`;
         
@@ -590,12 +609,9 @@ const UI={
         },50);
     },
     validateStatusTransition(oldStatus, newStatus){
-        const oldSt = String(oldStatus || 'NUEVO').trim().toUpperCase().replace(/\s+/g,'_');
         const newSt = String(newStatus || 'RECIBIDA').trim().toUpperCase().replace(/\s+/g,'_');
-        if(oldSt === newSt) return true;
-        const allowed = STATUS_TRANSITIONS[oldSt] || [];
-        if(!allowed.includes(newSt)) {
-            alert(`Transicion de estatus no permitida: ${oldSt} -> ${newSt}`);
+        if(!newSt) {
+            alert('Selecciona un estatus válido.');
             return false;
         }
         return true;
@@ -631,12 +647,9 @@ const UI={
 
 const App = {
     validateStatusTransition(oldStatus, newStatus){
-        const oldSt = String(oldStatus || 'NUEVO').trim().toUpperCase().replace(/\s+/g,'_');
         const newSt = String(newStatus || 'RECIBIDA').trim().toUpperCase().replace(/\s+/g,'_');
-        if(oldSt === newSt) return true;
-        const allowed = STATUS_TRANSITIONS[oldSt] || [];
-        if(!allowed.includes(newSt)) {
-            alert(`Transicion de estatus no permitida: ${oldSt} -> ${newSt}`);
+        if(!newSt) {
+            alert('Selecciona un estatus válido.');
             return false;
         }
         return true;
@@ -843,6 +856,7 @@ const App = {
     isAgendaStatus(s){
         const st = String(s||'').trim().toUpperCase().replace(/\s+/g,'_');
         return [
+            'AUTORIZADA',
             'EN_DESPACHO',
             'AGENDADA_RECOLECCION',
             'PENDIENTE_RECOGER',
@@ -852,6 +866,7 @@ const App = {
     isPickupStatus(s){
         const st = String(s||'').trim().toUpperCase().replace(/\s+/g,'_');
         return [
+            'AUTORIZADA',
             'EN_DESPACHO',
             'AGENDADA_RECOLECCION',
             'PENDIENTE_RECOGER',
@@ -875,6 +890,7 @@ const App = {
         // Determine recItems: if there is an explicit pending list use it, otherwise subtract
         // items already picked from the authorized items only when the status is committed.
         const st = String(r.Estatus_Actual||'').trim().toUpperCase().replace(/\s+/g,'_');
+        if(!picked.length && ['RECOGIDA','ENTREGADA','EN_COMPROBACION'].includes(st)) picked = authorized;
         let recItems = [];
         if(explicitPending.length && !['RECIBIDA','CANCELADA','VENCIDA','COMPROBADA'].includes(st)) {
             recItems = explicitPending;
@@ -891,11 +907,11 @@ const App = {
         } else {
             compItems = this.subtractItems(picked, compReg);
         }
-        const terminal = ['RECIBIDA','AUTORIZADA','CANCELADA','VENCIDA','COMPROBADA'].includes(st);
+        const terminal = ['RECIBIDA','AUTORIZADA','CANCELADA','VENCIDA'].includes(st);
         const hasAgendaData = !!(r.Recoleccion_Fecha_Agendada || r.Recoleccion_Fecha_Limite);
         const canAgenda = (this.isAgendaStatus(st) && recItems.length > 0) || hasAgendaData;
         const canCollect = (this.isPickupStatus(st) || explicitPending.length > 0) && recItems.length > 0;
-        const canCheck = !terminal && picked.length > 0 && compItems.length > 0;
+        const canCheck = (!terminal && picked.length > 0 && compItems.length > 0) || (st === 'COMPROBADA' && (compReg.length > 0 || picked.length > 0));
         document.getElementById('recItem').innerHTML = '<option value="">-- Insumo pendiente --</option>' + recItems.map(i=>`<option value="${i.Item}" data-max="${i.Cantidad}">${i.Item} | Pendiente: ${i.Cantidad}</option>`).join('');
         document.getElementById('compItem').innerHTML = '<option value="">-- Insumo por comprobar --</option>' + compItems.map(i=>`<option value="${i.Item}" data-max="${i.Cantidad}">${i.Item} | Pendiente: ${i.Cantidad}</option>`).join('');
         document.getElementById('gestionOpsSection').classList.toggle('hidden', !Store.currentEditId);
@@ -1003,7 +1019,7 @@ const App = {
         UI.buildForm(false, record);
         document.getElementById('itemsContainer').innerHTML='';
         try{ JSON.parse(record.Inv_Items_JSON || '[]').forEach(i=>UI.appendItemRow(i)); }catch(e){}
-        document.getElementById('sectionComprobacion').classList.toggle('hidden', !['COMPROBADA','ENTREGADA','EN_COMPROBACION','RECOGIDA','PARCIALMENTE_RECOGIDA'].includes(String(record.Estatus_Actual||'').toUpperCase()));
+        document.getElementById('sectionComprobacion').classList.toggle('hidden', !['COMPROBADA','ENTREGADA','EN_COMPROBACION','IMPORTADO_EN_REVISION','RECOGIDA','PARCIALMENTE_RECOGIDA'].includes(String(record.Estatus_Actual||'').toUpperCase()));
         this.fillGestionOps(record);
         this.loadGestionDetalle(record.Id_Gestion);
         if(document.getElementById('cMonto')) document.getElementById('cMonto').value = record.Comprobacion_Monto || '';
@@ -1076,6 +1092,7 @@ const App = {
         const p = { view: Store.currentView, Modulo: Store.currentView==='actor_social'?'ACTOR':Store.currentView.toUpperCase(), usuarioSesion: Store.session.user, Inv_Items_JSON: JSON.stringify(items), Id_Gestion: Store.currentEditId, rowIndex: Store.rowIndex };
         ['fFecha:Fecha_Recepcion','fCanal:Canal_Entrada','fEstatus:Estatus_Actual','fNombre:Nombre_Solicitante','fTelefono:Telefono_Solicitante','fMunicipio:Municipio','fColonia:Colonia','fSeccion:Seccion','fDesc:Descripcion_Necesidad'].forEach(x=>{ const [id,k] = x.split(':'); const el = document.getElementById(id); if(el) p[k] = el.value; });
         if(document.getElementById('fPuesto')) p.Puesto_Solicitante = document.getElementById('fPuesto').value;
+        if(document.getElementById('fTipoSolicitante')) p.Tipo_Solicitante = document.getElementById('fTipoSolicitante').value;
         if(document.getElementById('fIntermediario')) p.Intermediario_Entrega = document.getElementById('fIntermediario').value;
         if(document.getElementById('agFecha')) p.Recoleccion_Fecha_Agendada = document.getElementById('agFecha').value;
         if(document.getElementById('agLimite')) p.Recoleccion_Fecha_Limite = document.getElementById('agLimite').value;
@@ -1094,7 +1111,7 @@ const App = {
                 const ev = await App.uploadEvidence(r.Id_Gestion || p.Id_Gestion, file);
                 if(!ev.ok) alert("Registro guardado, pero no se pudo subir la evidencia: " + ev.message);
             }
-            UI.closeModal('modalForm'); App.fetchData(); alert("Guardado correctamente");
+            UI.closeModal('modalForm'); await App.fetchData(); alert(r.message || "Guardado correctamente");
         } else alert("Error: " + r.message);
         UI.toggleLoader(false);
     },
